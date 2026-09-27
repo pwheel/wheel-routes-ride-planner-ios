@@ -28,6 +28,11 @@ enum MapStyleOption: String, CaseIterable, Identifiable {
 
     var isApple: Bool { group == .apple }
 
+    /// The style turn-by-turn navigation renders with. Ferrostar's UI only runs on MapLibre, so
+    /// OSM styles navigate as themselves and Apple styles fall back to CyclOSM, which needs no
+    /// Thunderforest key. The persisted `mapStyle` choice is never changed.
+    var navigationStyle: MapStyleOption { isApple ? .cyclOSM : self }
+
     /// `true` for the 2 OSM styles whose tiles are served by Thunderforest and therefore need a
     /// real API key to load (`.osmStandard`, `.cycleMap`); `false` for CyclOSM (no key needed)
     /// and all Apple styles.
