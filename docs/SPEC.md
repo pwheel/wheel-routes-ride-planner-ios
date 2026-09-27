@@ -18,6 +18,7 @@ SwiftUI iOS app for planning cycle routes using the CycleStreets API (journey pl
 - Xcode 16+ `PBXFileSystemSynchronizedRootGroup` — new source files placed under a synced folder are auto-included in the target. Don't hand-edit `project.pbxproj` to add files.
 - Testing: **Swift Testing** (`import Testing`, `@Test`, `#expect`), not XCTest, for all unit tests.
 - Map rendering supports two providers, switched via `MapStyleOption` (`Features/Map/MapStyleOption.swift`): Apple's native styles (`MapStyle.standard/.hybrid/.imagery`) via SwiftUI's `Map`, and 3 OpenStreetMap-tile styles (OSM Standard/CyclOSM/Cycle Map) via `MapLibreSwiftUI.MapView` (the `maplibre/swiftui-dsl` SPM package, pinned `v0.25.0`) pointed at a small self-authored MapLibre raster-style JSON. `MapViewModel` is unaware of the distinction — it stays in `MapView.swift`.
+- Turn-by-turn navigation (GitHub #20) is built on [Ferrostar](https://github.com/stadiamaps/ferrostar): an SPM package pinned exactly to `0.57.0`, with the products `FerrostarCore` and `FerrostarMapLibreUI` linked to the app target only. Its core is a precompiled Rust XCFramework (see `CLAUDE.md`'s supply-chain note). Ferrostar's UI is built on the same `swiftui-dsl` package as the OSM map path, so navigation always renders with MapLibre.
 
 ## Screens & ViewModels
 
