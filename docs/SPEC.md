@@ -48,6 +48,7 @@ Turn-by-turn guidance along a planned `Journey` (GitHub #20), built on Ferrostar
   - **Off-by-one:** CycleStreets' `turn` is the turn *into* a segment, so step N's instruction is built from segment N+1's turn and name, and the final step is "Arrive at destination".
   - **Instructions:** each step has one banner, shown for the whole step. Spoken cues are "In 200 metres, …" (only for steps ≥ 200 m, or "220 yards" when imperial) plus an immediate cue at `min(30 m, step length)`.
   - **Errors:** throws `JourneyRouteAdapterError.insufficientGeometry` when there are no segments or fewer than 2 distinct points.
+- `WheelRoutesRerouteProvider`: a Ferrostar `CustomRouteProvider`. When the rider deviates, it re-plans from the rider's position to the last remaining waypoint with the journey's own `RoutePlan`, via `APIClientProtocol.planJourney`, then passes the result through `JourneyRouteAdapter`. It's `nonisolated` because Ferrostar calls it off the main actor. `FerrostarCore` 0.57.0 silently swallows reroute errors, so the provider reports every failure through `onFailure` before rethrowing (with `WheelRoutesRerouteError.noDestination` if there are no waypoints).
 
 ### Itinerary (`Features/Itinerary/`)
 Turn-by-turn view of a planned `Journey`. `ItineraryViewModel` (plain, not `@Observable`) formats segments into rows (street name, turn instruction, distance, duration) plus totals, respecting the `useMetric` setting. Toolbar: "Save" (names and persists via `SavedRoutesViewModel`) and `GPXExportButton`.
