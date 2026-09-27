@@ -43,6 +43,11 @@ The home screen. Search a start/end location (via Photon, an OSM-data-backed geo
 Turn-by-turn guidance along a planned `Journey` (GitHub #20), built on Ferrostar (see Architecture). Design record: `docs/superpowers/specs/2026-09-25-turn-by-turn-navigation-design.md`.
 
 - `TurnManeuver`: maps a CycleStreets `Segment.turn` string (case- and whitespace-insensitive) to a Ferrostar `ManeuverType`/`ManeuverModifier` plus an imperative verb. The known vocabulary was verified live: straight on, bear/turn/sharp left/right, join roundabout, first–fifth exit. Anything else falls back to "Continue". `instructionText(roadName:)` appends "onto <road>" unless the road is blank or a CycleStreets placeholder containing "un-named", or the maneuver is joining a roundabout or arriving.
+- `JourneyRouteAdapter.route(from:useMetric:) throws -> Route`: a pure translation of the already-fetched `Journey` into Ferrostar's model, with no extra routing request.
+  - **Geometry and metadata:** one `RouteStep` per `Segment`. Route geometry is all points with shared segment endpoints collapsed. Waypoints are the first and last coordinates (`.break`).
+  - **Off-by-one:** CycleStreets' `turn` is the turn *into* a segment, so step N's instruction is built from segment N+1's turn and name, and the final step is "Arrive at destination".
+  - **Instructions:** each step has one banner, shown for the whole step. Spoken cues are "In 200 metres, …" (only for steps ≥ 200 m, or "220 yards" when imperial) plus an immediate cue at `min(30 m, step length)`.
+  - **Errors:** throws `JourneyRouteAdapterError.insufficientGeometry` when there are no segments or fewer than 2 distinct points.
 
 ### Itinerary (`Features/Itinerary/`)
 Turn-by-turn view of a planned `Journey`. `ItineraryViewModel` (plain, not `@Observable`) formats segments into rows (street name, turn instruction, distance, duration) plus totals, respecting the `useMetric` setting. Toolbar: "Save" (names and persists via `SavedRoutesViewModel`) and `GPXExportButton`.
