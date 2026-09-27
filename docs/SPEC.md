@@ -3,7 +3,7 @@
 > Living document. Describes what's actually built, not what was originally planned.
 > **Must be updated in the same PR/commit as any change that adds, removes, or materially changes a screen, ViewModel, API contract, persistence schema, or cross-cutting pattern.** See `docs/REVIEW_CHECKLIST.md`.
 >
-> Last verified against: `worktree-implement-plan` @ `566c294`.
+> Last verified against: `feat/turn-by-turn-navigation` @ `7ce3fe2`.
 > Historical record (original plan, UAT findings, roadmap decisions) lives in `docs/superpowers/plans/` — this file is the current-state snapshot, those are the "how we got here."
 
 ## Overview
@@ -149,7 +149,7 @@ Thunderforest tile-provider key follows the identical pattern: `Resources/Thunde
 
 ## Test coverage
 
-`Wheel RoutesTests/`: `Networking/{APIKeyTests, APIClientTests, JourneyPlanDecoderTests, MockAPIClient}`, `Features/{MapViewModelTests, ItineraryViewModelTests, SavedRoutesViewModelTests, MapStyleOptionTests}`, `Models/{JourneyTests}`, `Persistence/{RouteStoreTests, LocationStoreTests}`, `Location/{MockLocationService}`, `Search/{PhotonEndpointTests, PhotonGeocoderDecoderTests}`.
+`Wheel RoutesTests/`: `Networking/{APIKeyTests, APIClientTests, JourneyPlanDecoderTests, MockAPIClient}`, `Features/{MapViewModelTests, ItineraryViewModelTests, SavedRoutesViewModelTests, MapStyleOptionTests}`, `Features/Navigation/{TurnManeuverTests, JourneyRouteAdapterTests, WheelRoutesRerouteProviderTests, NavigationViewModelTests}`, `Models/{JourneyTests}`, `Persistence/{RouteStoreTests, LocationStoreTests}`, `Location/{MockLocationService}`, `Search/{PhotonEndpointTests, PhotonGeocoderDecoderTests}`, `TestSupport/{WaitUntil, NavigationFixtures}`.
 
 **Known gaps** (pure-SwiftUI-wiring or genuinely hard-to-unit-test, treated as build-verify-only per project convention): `SavedLocationsViewModel`, `SettingsView`, `GPXExportButton`, `ItineraryView`, `SavedRoutesView`, `Endpoints`, `MapStyleSheet`, `MapStyleThumbnail`, `LocationService` (the real `CLLocationManager` wrapper — not exercisable via `xcodebuild test` on a simulator without a simulated GPX location), `NavigationScreen` and `MapView`'s Start-button / `.fullScreenCover` wiring (manual check: simulator launch with `-simulateNavigation`).
 
@@ -166,3 +166,5 @@ OSM tile-based map rendering (GitHub #9) is implemented — see the Map screen s
 Map auto-centering and a recenter button (GitHub #6, remaining half) are implemented — see the Map screen section above. Design record: `docs/superpowers/specs/2026-08-02-map-location-centering-design.md`; implementation plan: `docs/superpowers/plans/2026-08-02-map-location-centering.md`.
 
 Location search (GitHub #19) now uses [Photon](https://photon.komoot.io), a public OSM-data-backed geocoder, instead of CycleStreets' own geocoder — a straight replacement, not a flag-based dual-provider system. Originally scoped around Apple MapKit; revised mid-implementation once it became clear Apple's MapKit terms restrict search-result usage to Apple's own map, conflicting with this app's OSM-tile rendering (GitHub #9). Design record: `docs/superpowers/specs/2026-08-08-improve-typeahead-design.md`; implementation plan: `docs/superpowers/plans/2026-08-08-improve-typeahead.md`.
+
+Turn-by-turn navigation (GitHub #20) is implemented, but only in the foreground. Guidance and voice pause when the app is backgrounded or the screen locks; the screen is kept awake during navigation instead. Background navigation (`UIBackgroundModes` location+audio) is tracked separately (see the follow-up issue linked from #20). Navigation always renders with MapLibre/OSM tiles, never Apple's `Map`, which is Ferrostar's constraint. Deviation thresholds (25 m / 25 m) are starting values pending real rides. Design record: `docs/superpowers/specs/2026-09-25-turn-by-turn-navigation-design.md`; implementation plan: `docs/superpowers/plans/2026-09-25-turn-by-turn-navigation.md`.
