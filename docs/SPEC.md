@@ -58,7 +58,7 @@ Turn-by-turn guidance along a planned `Journey` (GitHub #20), built on Ferrostar
   - **Location source:** `makeLocationProvider()` returns `CoreLocationProvider(activityType: .fitness)`, or, in DEBUG builds with the launch argument `-simulateNavigation`, a `SimulatedLocationProvider` that replays the route.
 - `NavigationScreen`: a full-screen `DynamicallyOrientingNavigationView` (Ferrostar's bundled UI: maneuver banner, trip progress, mute and exit, automotive follow camera, portrait/landscape) for one `ActiveNavigation` (the view model plus a MapLibre style URL).
   - **Banners and cards:** the top-center banner shows the reroute failure (tap to dismiss) or "Recalculating route…". An overlay card shows "You've arrived" / Done, or `startErrorMessage` / Close.
-  - **Settings:** mute is persisted to `@AppStorage("navigationMuted")`.
+  - **Settings:** mute is persisted to `@AppStorage("navigationMuted")`. Banner and trip-progress distances follow `@AppStorage("useMetric")` (m/km or yd/mi) rather than the locale: an `MKDistanceFormatter` pinned to those units is injected with `.navigationFormatterCollection` (which reaches the maneuver banner), and because Ferrostar 0.57.0's default trip-progress view ignores that collection, `.navigationViewProgressView` replaces it with an otherwise identical `TripProgressView` given the same formatter.
   - **Lifecycle:** it's foreground-only. `.task` starts the session, and `.onDisappear` stops it.
   - **Lost permission:** Ferrostar 0.57.0 ignores location-provider errors, so on each `scenePhase == .active` it checks `LocationServiceProtocol.isAuthorized` and offers Open Settings / End Navigation.
 

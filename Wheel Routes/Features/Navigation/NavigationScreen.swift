@@ -3,6 +3,7 @@
 //  Wheel Routes
 //
 
+import MapKit
 import SwiftUI
 import FerrostarCore
 import FerrostarCoreFFI
@@ -27,6 +28,7 @@ struct NavigationScreen: View {
     @State private var camera: MapViewCamera = .automotiveNavigation()
     @State private var isPresentingPermissionLostAlert = false
     @AppStorage("navigationMuted") private var navigationMuted = false
+    @AppStorage("useMetric") private var useMetric = true
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
 
@@ -42,6 +44,16 @@ struct NavigationScreen: View {
             onTapExit: { endNavigation() }
         )
         .navigationViewInnerGrid(topCenter: { statusBanner })
+        // Ferrostar's distance formatters follow the locale (yards/miles on en_GB), not the
+        // app's setting. The collection covers the maneuver banner; the bundled trip-progress
+        // view ignores it, so it's rebuilt exactly as Ferrostar's default
+        // (`DefaultNavigationViewComponents.defaultProgressView`) but with our formatter.
+        .navigationFormatterCollection(FoundationFormatterCollection(distanceFormatter: distanceFormatter))
+        .navigationViewProgressView { [distanceFormatter] state, onTapExit in
+            if case .navigating = state?.tripState, let progress = state?.currentProgress {
+                TripProgressView(progress: progress, distanceFormatter: distanceFormatter, onTapExit: onTapExit)
+            }
+        }
         .overlay {
             if vm.hasArrived {
                 messageCard(systemImage: "flag.checkered", title: "You've arrived", buttonTitle: "Done")
@@ -69,6 +81,15 @@ struct NavigationScreen: View {
         } message: {
             Text("Navigation needs location access. Enable it in Settings to keep going.")
         }
+    }
+
+    /// Ferrostar's default (`DefaultFormatters.distanceFormatter`) with units pinned to the
+    /// app's `useMetric` setting instead of the locale's.
+    private var distanceFormatter: MKDistanceFormatter {
+        let formatter = MKDistanceFormatter()
+        formatter.units = useMetric ? .metric : .imperialWithYards
+        formatter.unitStyle = .abbreviated
+        return formatter
     }
 
     @ViewBuilder private var statusBanner: some View {
