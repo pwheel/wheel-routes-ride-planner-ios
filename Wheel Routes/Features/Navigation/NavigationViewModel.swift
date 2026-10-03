@@ -40,7 +40,7 @@ final class NavigationViewModel {
     @ObservationIgnored private let journey: Journey
     @ObservationIgnored private let useMetric: Bool
     @ObservationIgnored private let locationProvider: LocationProviding
-    @ObservationIgnored private let setIdleTimerDisabled: (Bool) -> Void
+    @ObservationIgnored private let setIdleTimerDisabled: @MainActor (Bool) -> Void
     /// Held strongly here because `FerrostarCore.delegate` is weak.
     @ObservationIgnored private let coreDelegate = CoreDelegateProxy()
     @ObservationIgnored private var cancellables: Set<AnyCancellable> = []
@@ -52,7 +52,7 @@ final class NavigationViewModel {
         useMetric: Bool,
         isInitiallyMuted: Bool,
         locationProvider: LocationProviding,
-        setIdleTimerDisabled: @escaping (Bool) -> Void = { UIApplication.shared.isIdleTimerDisabled = $0 }
+        setIdleTimerDisabled: @escaping @MainActor (Bool) -> Void = { UIApplication.shared.isIdleTimerDisabled = $0 }
     ) {
         let rerouteProvider = WheelRoutesRerouteProvider(apiClient: apiClient, plan: journey.plan, useMetric: useMetric)
         self.journey = journey

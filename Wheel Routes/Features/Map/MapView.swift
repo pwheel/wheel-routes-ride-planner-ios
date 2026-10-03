@@ -552,9 +552,11 @@ struct MapView: View {
     /// surfaces through the existing "Location Access Needed" alert, then presents
     /// `NavigationScreen` for the selected plan's journey.
     private func startNavigation() {
-        guard !vm.isLoading, let journey = vm.currentJourney else { return }
+        guard !vm.isLoading, vm.currentJourney != nil else { return }
         Task {
-            guard await vm.prepareNavigation() else { return }
+            // Read the journey only after the location gate, which can take seconds: the rider
+            // may clear the route or switch plans meanwhile.
+            guard await vm.prepareNavigation(), let journey = vm.currentJourney else { return }
             guard let styleURL = navigationStyleURL() else {
                 vm.errorMessage = "Couldn't load the navigation map. Please try again."
                 return
