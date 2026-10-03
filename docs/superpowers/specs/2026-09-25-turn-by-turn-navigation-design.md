@@ -53,7 +53,8 @@ Changes to existing code:
 - `waypoints` holds the first and last coordinates, both with kind `.break`, and `properties` = `nil`.
 - Each segment becomes one `RouteStep`:
   - `geometry` = `segment.points`, `distance` = `distanceMetres`, `duration` = `timeSeconds`, `roadName` = `name`
-  - `exits` = `[]`, `annotations` = `nil`, `incidents` = `[]`, `drivingSide` = `.right`, `roundaboutExitNumber` = `nil`
+  - `exits` = `[]`, `annotations` = `nil`, `incidents` = `[]`, `drivingSide` = `nil`, `roundaboutExitNumber` = `nil`
+  - `drivingSide` is `nil` (unknown) because CycleStreets responses carry no country or traffic-side data, and its main market, the UK, drives on the left. Ferrostar 0.57.0 only uses it for roundabout rendering (CarPlay/Android Auto). An earlier draft of this design said `.right`.
 
 ### Off-by-one: turns attach to the preceding step
 CycleStreets' `segment.turn` is the turn made *to enter* that segment. Ferrostar shows a step's instructions *while the rider is on that step*, so they must describe the maneuver at the step's *end*.

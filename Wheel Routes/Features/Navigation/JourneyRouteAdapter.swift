@@ -6,7 +6,7 @@
 import Foundation
 import FerrostarCoreFFI
 
-enum JourneyRouteAdapterError: Error, Equatable {
+nonisolated enum JourneyRouteAdapterError: Error, Equatable {
     /// No segments, or fewer than 2 distinct coordinates: nothing to navigate along.
     case insufficientGeometry
 }
@@ -79,6 +79,9 @@ nonisolated enum JourneyRouteAdapter {
         let distance = Double(segment.distanceMetres)
         let maneuver = next.map { TurnManeuver(cycleStreetsTurn: $0.turn) } ?? .arrival
         let text = maneuver.instructionText(roadName: next?.name)
+        // Not `next == nil`: that picks `Segment`'s main-actor `Equatable` conformance, which
+        // can't be used from this nonisolated code.
+        let isArrival = next.map { _ in false } ?? true
         let banner = VisualInstruction(
             primaryContent: VisualInstructionContent(
                 text: text, maneuverType: maneuver.type, maneuverModifier: maneuver.modifier,
@@ -98,10 +101,13 @@ nonisolated enum JourneyRouteAdapter {
             exits: [],
             instruction: text,
             visualInstructions: [banner],
-            spokenInstructions: spokenCues(text: text, isArrival: next == nil, stepDistance: distance, useMetric: useMetric),
+            spokenInstructions: spokenCues(text: text, isArrival: isArrival, stepDistance: distance, useMetric: useMetric),
             annotations: nil,
             incidents: [],
-            drivingSide: .right,
+            // Unknown: CycleStreets responses carry no country or traffic-side data, and the UK
+            // (its main market) drives on the left. Ferrostar 0.57.0 only uses this for
+            // roundabout rendering (CarPlay/Android Auto), so nil is honest until we derive it.
+            drivingSide: nil,
             roundaboutExitNumber: nil
         )
     }

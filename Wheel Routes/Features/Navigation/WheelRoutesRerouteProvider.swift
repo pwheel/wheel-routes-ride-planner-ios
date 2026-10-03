@@ -7,7 +7,7 @@ import CoreLocation
 import FerrostarCore
 import FerrostarCoreFFI
 
-enum WheelRoutesRerouteError: Error, Equatable {
+nonisolated enum WheelRoutesRerouteError: Error, Equatable {
     /// Ferrostar asked for a route with no remaining waypoints to head for.
     case noDestination
 }

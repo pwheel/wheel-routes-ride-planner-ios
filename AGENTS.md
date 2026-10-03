@@ -24,6 +24,7 @@ xcodebuild test -project "Wheel Routes.xcodeproj" -scheme "Wheel Routes" -destin
 - **TDD**: write a failing test, confirm it fails for the right reason, implement minimally, confirm green. Pure-SwiftUI-wiring changes with no testable logic (navigation, `@State` resets) are build-verify-only — see `docs/SPEC.md` → Test coverage for the established list of what falls in that bucket.
 - **Xcode 16+ `PBXFileSystemSynchronizedRootGroup`**: new source files placed under a synced folder are auto-included in the target. Don't hand-edit `project.pbxproj` to add/remove source files.
 - `@Observable @MainActor final class` for ViewModels; plain `Codable, Equatable` structs/enums for models.
+- **`MemberImportVisibility` is enabled**: a file must explicitly `import` every module whose members it uses (e.g. `import CoreLocation` for `CLLocationCoordinate2D.latitude`), even if another imported module re-exports it.
 - Cross-tab state hand-off: see `docs/SPEC.md` → "Cross-tab hand-off pattern" before inventing a new mechanism for passing state/actions between tabs.
 
 ## Secrets
