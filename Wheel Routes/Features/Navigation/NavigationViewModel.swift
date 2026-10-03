@@ -32,7 +32,9 @@ final class NavigationViewModel {
     private(set) var isMuted: Bool
     private(set) var rerouteErrorMessage: String?
     private(set) var startErrorMessage: String?
-    var hasArrived: Bool { Self.isComplete(navigationState?.tripState) }
+    /// Latched the first time the trip completes, which also ends the session (see
+    /// `handle(_:)`). Ending it clears `navigationState`, so this can't be derived from that.
+    private(set) var hasArrived = false
 
     @ObservationIgnored private let core: FerrostarCore
     @ObservationIgnored private let journey: Journey
@@ -68,11 +70,15 @@ final class NavigationViewModel {
         core.delegate = coreDelegate
         coreDelegate.onRoutesLoaded = { [weak self] routes in self?.acceptReroute(routes) }
         rerouteProvider.onFailure = { [weak self] _ in
-            Task { @MainActor in self?.rerouteErrorMessage = Self.rerouteFailedMessage }
+            Task { @MainActor in
+                // `stop()` cancels any in-flight reroute, which also surfaces as a failure.
+                guard let self, self.isActive else { return }
+                self.rerouteErrorMessage = Self.rerouteFailedMessage
+            }
         }
         core.$state
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] state in self?.navigationState = state }
+            .sink { [weak self] state in self?.handle(state) }
             .store(in: &cancellables)
         core.spokenInstructionObserver.$isMuted
             .receive(on: DispatchQueue.main)
@@ -128,6 +134,21 @@ final class NavigationViewModel {
         }
         #endif
         return CoreLocationProvider(activityType: .fitness, allowBackgroundLocationUpdates: false)
+    }
+
+    private func handle(_ state: NavigationState?) {
+        navigationState = state
+        // A failed-reroute banner is stale once a new recalculation starts (it would otherwise
+        // hide "Recalculating route…") or once the rider is back on the route.
+        if state?.isCalculatingNewRoute == true || state?.currentDeviation == .noDeviation {
+            rerouteErrorMessage = nil
+        }
+        // Ferrostar's `.complete` doesn't stop GPS or speech, so end the session here rather
+        // than waiting for Done, in case the rider pockets the phone at the destination.
+        if !hasArrived, Self.isComplete(state?.tripState) {
+            hasArrived = true
+            stop()
+        }
     }
 
     private func acceptReroute(_ routes: [Route]) {
