@@ -9,13 +9,23 @@ enum APIKey {
         let name = Bundle.main.object(forInfoDictionaryKey: "APIKeyFileName") as? String
             ?? (ProcessInfo.processInfo.environment["CYCLESTREETS_ENV"] == "live"
                 ? "APIKey_live" : "APIKey_dev")
-        return try loadKey(named: name)
+        return try loadKey(named: name, devFallback: "APIKey_dev")
     }
 
     static func loadThunderforestKey() throws -> String {
-        let name = ProcessInfo.processInfo.environment["CYCLESTREETS_ENV"] == "live"
-            ? "ThunderforestAPIKey_live" : "ThunderforestAPIKey_dev"
-        return try loadKey(named: name)
+        let name = Bundle.main.object(forInfoDictionaryKey: "ThunderforestAPIKeyFileName") as? String
+            ?? (ProcessInfo.processInfo.environment["CYCLESTREETS_ENV"] == "live"
+                ? "ThunderforestAPIKey_live" : "ThunderforestAPIKey_dev")
+        return try loadKey(named: name, devFallback: "ThunderforestAPIKey_dev")
+    }
+
+    /// Falls back to the dev key file when the resolved (live) file is missing or blank, since the
+    /// live file is gitignored outright and may not exist locally until a distinct production key is set.
+    private static func loadKey(named name: String, devFallback: String) throws -> String {
+        if let key = try? loadKey(named: name), !key.isEmpty {
+            return key
+        }
+        return try loadKey(named: devFallback)
     }
 
     private static func loadKey(named name: String) throws -> String {
