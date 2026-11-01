@@ -13,6 +13,9 @@ final class MockAPIClient: APIClientProtocol {
     var shouldThrow: Error?
     var journeysByPlan: [RoutePlan: Journey] = [:]
     var errorsByPlan: [RoutePlan: Error] = [:]
+    /// Every `planJourney` request, in order, recorded before any configured error is thrown
+    /// (the real client can also fail before sending, e.g. while building the URL).
+    private(set) var planJourneyCalls: [(from: CLLocationCoordinate2D, to: CLLocationCoordinate2D, plan: RoutePlan)] = []
 
     private func checkThrow() throws {
         if let e = shouldThrow { throw e }
@@ -21,6 +24,7 @@ final class MockAPIClient: APIClientProtocol {
     func planJourney(from: CLLocationCoordinate2D,
                      to: CLLocationCoordinate2D,
                      plan: RoutePlan) async throws -> Journey {
+        planJourneyCalls.append((from: from, to: to, plan: plan))
         if let error = errorsByPlan[plan] { throw error }
         try checkThrow()
         return journeysByPlan[plan] ?? journeyToReturn ?? makeJourney(plan: plan)

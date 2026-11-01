@@ -34,4 +34,15 @@ jobs:
             -scheme "Wheel Routes" \
             -destination "platform=iOS Simulator,name=iPhone 17" \
             -skip-testing:"Wheel RoutesUITests" \
+            -resultBundlePath TestResults.xcresult \
             -skipMacroValidation
+
+      # Swift Testing's per-issue failure messages only land in the result
+      # bundle, not the xcodebuild log, so keep it when a run fails.
+      - name: Upload test results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: TestResults
+          path: TestResults.xcresult
+          retention-days: 7
