@@ -417,8 +417,11 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				CYCLESTREETS_APIKEY_FILE = APIKey_dev;
+				CYCLESTREETS_THUNDERFOREST_KEY_FILE = ThunderforestAPIKey_dev;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Wheel Routes.xcodeproj/APIKeyInfo.plist";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Wheel Routes uses your location to plan routes starting from or ending at where you are.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -449,8 +452,11 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				CYCLESTREETS_APIKEY_FILE = APIKey_live;
+				CYCLESTREETS_THUNDERFOREST_KEY_FILE = ThunderforestAPIKey_live;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Wheel Routes.xcodeproj/APIKeyInfo.plist";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Wheel Routes uses your location to plan routes starting from or ending at where you are.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
