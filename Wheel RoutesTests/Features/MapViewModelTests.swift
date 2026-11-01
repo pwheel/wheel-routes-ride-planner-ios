@@ -8,28 +8,6 @@ import Foundation
 import CoreLocation
 @testable import Wheel_Routes
 
-/// Polls `condition` until it becomes true or `timeout` elapses, instead of
-/// sleeping a fixed duration and hoping the async work under test finished in
-/// time. This suite runs with default (non-serialized) Swift Testing
-/// parallelism, so a fixed sleep margin is unreliable under CI's variable
-/// CPU contention — condition-based waiting is deterministic regardless of
-/// scheduling delay.
-@MainActor
-private func waitUntil(
-    timeout: Duration = .seconds(5),
-    pollInterval: Duration = .milliseconds(10),
-    _ condition: () -> Bool
-) async throws {
-    let deadline = ContinuousClock.now + timeout
-    while !condition() {
-        if ContinuousClock.now >= deadline {
-            Issue.record("Timed out after \(timeout) waiting for condition")
-            return
-        }
-        try await Task.sleep(for: pollInterval)
-    }
-}
-
 @MainActor
 final class MapViewModelTests {
     let client: MockAPIClient
@@ -429,5 +407,49 @@ final class MapViewModelTests {
     @Test func testSearchPassesNilNearWhenNoBiasCoordinate() async throws {
         await vm.search(query: "Cambridge")
         #expect(searchProvider.queriesReceived.last?.near == nil)
+    }
+
+    // MARK: - prepareNavigation
+
+    @Test func prepareNavigationSucceedsWhenALocationFixIsAvailable() async {
+        let ready = await vm.prepareNavigation()
+        #expect(ready)
+        #expect(!vm.isLoading)
+        #expect(vm.errorMessage == nil)
+        #expect(!vm.isPresentingLocationPermissionAlert)
+    }
+
+    @Test func prepareNavigationOffersSettingsWhenPermissionIsDeniedOrRestricted() async {
+        for error in [LocationServiceError.permissionDenied, .restricted] {
+            vm.isPresentingLocationPermissionAlert = false
+            locationService.errorToThrow = error
+            let ready = await vm.prepareNavigation()
+            #expect(!ready)
+            #expect(vm.isPresentingLocationPermissionAlert)
+            #expect(!vm.isLoading)
+        }
+    }
+
+    @Test func prepareNavigationShowsAGenericErrorWhenLocationIsUnavailable() async {
+        locationService.errorToThrow = LocationServiceError.unavailable
+        let ready = await vm.prepareNavigation()
+        #expect(!ready)
+        #expect(vm.errorMessage == "Couldn't get your current location. Please try again.")
+        #expect(!vm.isPresentingLocationPermissionAlert)
+    }
+
+    @Test func prepareNavigationStaysSilentForADuplicateInFlightFetch() async {
+        locationService.errorToThrow = LocationServiceError.alreadyInProgress
+        let ready = await vm.prepareNavigation()
+        #expect(!ready)
+        #expect(vm.errorMessage == nil)
+        #expect(!vm.isPresentingLocationPermissionAlert)
+    }
+
+    @Test func prepareNavigationNeverTouchesWaypointsOrRoutes() async {
+        _ = await vm.prepareNavigation()
+        #expect(vm.fromPlace == nil)
+        #expect(vm.toPlace == nil)
+        #expect(vm.routeOptions.isEmpty)
     }
 }

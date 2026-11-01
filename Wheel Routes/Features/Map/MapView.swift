@@ -3,10 +3,17 @@ import MapKit
 import MapLibre
 import MapLibreSwiftDSL
 import MapLibreSwiftUI
+import FerrostarCore
 
 struct MapView: View {
     @State private var vm: MapViewModel
     @Environment(\.apiClient) private var apiClient
+    @Environment(\.locationService) private var locationService
+    @AppStorage("useMetric") private var useMetric = true
+    @AppStorage("navigationMuted") private var navigationMuted = false
+    /// The running turn-by-turn session, if any. Holding the view model here means it's
+    /// created exactly once per session, when Start is tapped.
+    @State private var activeNavigation: ActiveNavigation?
     @Binding var pendingJourney: Journey?
     @Binding var pendingPlaceSelection: PendingPlaceSelection?
     @State private var searchText = ""
@@ -196,6 +203,12 @@ struct MapView: View {
                 }
             }
         }
+        .overlay(alignment: .bottom) {
+            if vm.currentJourney != nil { startNavigationButton }
+        }
+        .fullScreenCover(item: $activeNavigation) { navigation in
+            NavigationScreen(navigation: navigation, locationService: locationService)
+        }
         .overlay {
             if vm.isLoading { ProgressView().scaleEffect(1.5) }
         }
@@ -221,7 +234,7 @@ struct MapView: View {
                 }
             }
         } message: {
-            Text("Location access is off. Enable it in Settings to use Current Location.")
+            Text("Location access is off. Enable it in Settings to use your current location.")
         }
         .onChange(of: pendingJourney) { _, newValue in
             guard let journey = newValue else { return }
@@ -519,6 +532,53 @@ struct MapView: View {
         .sheet(isPresented: $isPresentingMapStyleSheet) {
             MapStyleSheet(selection: mapStyleBinding, thunderforestAPIKey: thunderforestAPIKey)
         }
+    }
+
+    private var startNavigationButton: some View {
+        Button {
+            startNavigation()
+        } label: {
+            Label("Start", systemImage: "figure.outdoor.cycle")
+                .font(.headline)
+                .padding(.horizontal, 8)
+        }
+        .buttonStyle(.borderedProminent)
+        .controlSize(.large)
+        .padding(.bottom)
+        .accessibilityLabel("Start turn-by-turn navigation")
+    }
+
+    /// Confirms location access first via `MapViewModel.prepareNavigation()`, so a denial
+    /// surfaces through the existing "Location Access Needed" alert, then presents
+    /// `NavigationScreen` for the selected plan's journey.
+    private func startNavigation() {
+        guard !vm.isLoading, vm.currentJourney != nil else { return }
+        Task {
+            // Read the journey only after the location gate, which can take seconds: the rider
+            // may clear the route or switch plans meanwhile.
+            guard await vm.prepareNavigation(), let journey = vm.currentJourney else { return }
+            guard let styleURL = navigationStyleURL() else {
+                vm.errorMessage = "Couldn't load the navigation map. Please try again."
+                return
+            }
+            activeNavigation = ActiveNavigation(
+                viewModel: NavigationViewModel(
+                    journey: journey, apiClient: apiClient, useMetric: useMetric,
+                    isInitiallyMuted: navigationMuted,
+                    locationProvider: NavigationViewModel.makeLocationProvider()
+                ),
+                styleURL: styleURL
+            )
+        }
+    }
+
+    /// Navigation always renders with MapLibre, so Apple styles fall back to
+    /// `MapStyleOption.navigationStyle`. The file is written under its own name so it never
+    /// clobbers `osmStyleURLCache`'s files.
+    private func navigationStyleURL() -> URL? {
+        let style = selectedMapStyle.navigationStyle
+        return try? style.mapLibreStyleDocument(thunderforestKey: thunderforestAPIKey)?
+            .writeToTemporaryFile(named: "navigation-\(style.rawValue)")
     }
 
     /// Fetches the current location via `MapViewModel` first (so a

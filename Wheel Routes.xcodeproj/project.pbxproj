@@ -10,6 +10,8 @@
 		5BDC1C95301652C100D06D8C /* MapLibreSwiftDSL in Frameworks */ = {isa = PBXBuildFile; productRef = 5BDC1C94301652C100D06D8C /* MapLibreSwiftDSL */; };
 		5BDC1C97301652C100D06D8C /* MapLibreSwiftMacros in Frameworks */ = {isa = PBXBuildFile; productRef = 5BDC1C96301652C100D06D8C /* MapLibreSwiftMacros */; };
 		5BDC1C99301652C100D06D8C /* MapLibreSwiftUI in Frameworks */ = {isa = PBXBuildFile; productRef = 5BDC1C98301652C100D06D8C /* MapLibreSwiftUI */; };
+		5BF0E1A2301700000000A001 /* FerrostarCore in Frameworks */ = {isa = PBXBuildFile; productRef = 5BF0E1A1301700000000A001 /* FerrostarCore */; };
+		5BF0E1A4301700000000A001 /* FerrostarMapLibreUI in Frameworks */ = {isa = PBXBuildFile; productRef = 5BF0E1A3301700000000A001 /* FerrostarMapLibreUI */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -61,6 +63,8 @@
 				5BDC1C99301652C100D06D8C /* MapLibreSwiftUI in Frameworks */,
 				5BDC1C95301652C100D06D8C /* MapLibreSwiftDSL in Frameworks */,
 				5BDC1C97301652C100D06D8C /* MapLibreSwiftMacros in Frameworks */,
+				5BF0E1A2301700000000A001 /* FerrostarCore in Frameworks */,
+				5BF0E1A4301700000000A001 /* FerrostarMapLibreUI in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -124,6 +128,8 @@
 				5BDC1C94301652C100D06D8C /* MapLibreSwiftDSL */,
 				5BDC1C96301652C100D06D8C /* MapLibreSwiftMacros */,
 				5BDC1C98301652C100D06D8C /* MapLibreSwiftUI */,
+				5BF0E1A1301700000000A001 /* FerrostarCore */,
+				5BF0E1A3301700000000A001 /* FerrostarMapLibreUI */,
 			);
 			productName = "Wheel Routes";
 			productReference = 5BCAB58E2FF461BD0070DF6C /* Wheel Routes.app */;
@@ -209,6 +215,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				5BDC1C93301652C100D06D8C /* XCRemoteSwiftPackageReference "swiftui-dsl" */,
+				5BF0E1A0301700000000A001 /* XCRemoteSwiftPackageReference "ferrostar" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 5BCAB58F2FF461BD0070DF6C /* Products */;
@@ -603,6 +610,14 @@
 				version = 0.25.0;
 			};
 		};
+		5BF0E1A0301700000000A001 /* XCRemoteSwiftPackageReference "ferrostar" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/stadiamaps/ferrostar";
+			requirement = {
+				kind = exactVersion;
+				version = 0.57.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -620,6 +635,16 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 5BDC1C93301652C100D06D8C /* XCRemoteSwiftPackageReference "swiftui-dsl" */;
 			productName = MapLibreSwiftUI;
+		};
+		5BF0E1A1301700000000A001 /* FerrostarCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5BF0E1A0301700000000A001 /* XCRemoteSwiftPackageReference "ferrostar" */;
+			productName = FerrostarCore;
+		};
+		5BF0E1A3301700000000A001 /* FerrostarMapLibreUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5BF0E1A0301700000000A001 /* XCRemoteSwiftPackageReference "ferrostar" */;
+			productName = FerrostarMapLibreUI;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

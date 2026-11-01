@@ -218,17 +218,33 @@ final class MapViewModel {
     }
 
     /// Fetches the device's current location purely to recenter the map
-    /// camera — unlike `useCurrentLocation(as:)`, this never touches
+    /// camera. Unlike `useCurrentLocation(as:)`, this never touches
     /// `fromPlace`/`toPlace` or triggers route planning. The caller doesn't
     /// need the coordinate itself: on success it switches the map camera
     /// into the frameworks' own follow-user-location tracking mode rather
-    /// than centering on a point held here. Same permission/error handling
-    /// as `useCurrentLocation`: `.permissionDenied`/`.restricted` sets
-    /// `isPresentingLocationPermissionAlert`; other failures set
-    /// `errorMessage`; `.alreadyInProgress` is swallowed silently, leaving
-    /// `isLoading` owned by the first call.
+    /// than centering on a point held here. Error handling is
+    /// `confirmCurrentLocationAvailable()`'s.
     @discardableResult
     func centerOnCurrentLocation() async -> Bool {
+        await confirmCurrentLocationAvailable()
+    }
+
+    /// Gate before presenting turn-by-turn navigation. Ferrostar's own location
+    /// provider assumes permission is already granted, so this confirms a real fix
+    /// through the app's service first. That way a denial surfaces through the same
+    /// "Location Access Needed" alert as everywhere else, instead of navigation
+    /// silently showing no position. Error handling is
+    /// `confirmCurrentLocationAvailable()`'s.
+    func prepareNavigation() async -> Bool {
+        await confirmCurrentLocationAvailable()
+    }
+
+    /// One-shot location fetch used only to confirm access, with the Map screen's
+    /// shared error handling: `.permissionDenied`/`.restricted` set
+    /// `isPresentingLocationPermissionAlert`, other failures set `errorMessage`,
+    /// and `.alreadyInProgress` is swallowed silently, leaving `isLoading` owned
+    /// by the first call.
+    private func confirmCurrentLocationAvailable() async -> Bool {
         isLoading = true
         do {
             _ = try await locationService.currentLocation()

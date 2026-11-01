@@ -75,4 +75,23 @@ struct MapStyleOptionTests {
         #expect(!MapStyleOption.appleHybrid.requiresThunderforestKey)
         #expect(!MapStyleOption.appleSatellite.requiresThunderforestKey)
     }
+
+    @Test func osmStylesNavigateInTheirOwnStyle() {
+        for option in [MapStyleOption.osmStandard, .cyclOSM, .cycleMap] {
+            #expect(option.navigationStyle == option)
+        }
+    }
+
+    @Test func appleStylesNavigateInCyclOSM() {
+        for option in [MapStyleOption.appleStandard, .appleHybrid, .appleSatellite] {
+            #expect(option.navigationStyle == .cyclOSM)
+        }
+    }
+
+    @Test func navigationStyleAlwaysHasAMapLibreStyleDocumentEvenWithoutAThunderforestKey() {
+        for option in MapStyleOption.allCases where option.isApple {
+            #expect(option.navigationStyle.mapLibreStyleDocument(thunderforestKey: "") != nil)
+            #expect(!option.navigationStyle.requiresThunderforestKey)
+        }
+    }
 }
