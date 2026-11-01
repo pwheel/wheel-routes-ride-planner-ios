@@ -23,6 +23,16 @@ struct MapView: View {
     @State private var mapLibreCamera = MapView.mapViewCamera(for: MapView.initialRegion)
     @State private var isPresentingMapStyleSheet = false
     @State private var hasAutoCenteredOnLaunch = false
+
+    /// Current map bearing in degrees (0 = north), captured from whichever engine is mounted —
+    /// `appleMap`'s `.onMapCameraChange` or `osmMap`'s `.onChange(of: mapLibreCamera)`. Reset to 0
+    /// on every style switch (see `.task(id: selectedMapStyle)` below) so a stale heading from the
+    /// previous engine can't leave `compassButton` incorrectly visible after switching styles.
+    @State private var currentHeading: Double = 0
+    /// The Apple path's last-seen camera, captured alongside `currentHeading` so `resetToNorth()`
+    /// can rebuild it with `heading: 0` while preserving center/distance/pitch — MapKit's
+    /// `MapCameraPosition` binding has no in-place "just zero the heading" API.
+    @State private var lastAppleCamera: MapCamera?
     @AppStorage("mapStyle") private var mapStyleRawValue = MapStyleOption.defaultOption.rawValue
     @Environment(\.thunderforestAPIKey) private var thunderforestAPIKey
 
@@ -119,6 +129,28 @@ struct MapView: View {
         osmStyleURLCache[selectedMapStyle] = try? document.writeToTemporaryFile(named: selectedMapStyle.rawValue)
     }
 
+    /// True once the map has been rotated away from north by more than a hair — gates
+    /// `compassButton`'s visibility. `currentHeading` is degrees clockwise from north in `0..<360`
+    /// (both engines report it that way), so distance-from-north is the smaller of the two
+    /// directions around the circle.
+    private var isRotated: Bool {
+        let normalized = currentHeading.truncatingRemainder(dividingBy: 360)
+        return min(normalized, 360 - normalized) > 0.5
+    }
+
+    /// Resets whichever engine is currently mounted back to north, preserving its center/zoom/
+    /// pitch. Only called from `compassButton`, which is only visible while `isRotated`.
+    private func resetToNorth() {
+        if selectedMapStyle.appleMapStyle != nil {
+            guard var camera = lastAppleCamera else { return }
+            camera.heading = 0
+            withAnimation { position = .camera(camera) }
+        } else if case let .centered(onCoordinate: coordinate, zoom: zoom, pitch: pitch, pitchRange: pitchRange, direction: _) = mapLibreCamera.state {
+            mapLibreCamera = .center(coordinate, zoom: zoom, pitch: pitch, pitchRange: pitchRange, direction: 0)
+        }
+        currentHeading = 0
+    }
+
     private var selectedMapStyle: MapStyleOption {
         get { MapStyleOption(rawValue: mapStyleRawValue) ?? .defaultOption }
         nonmutating set { mapStyleRawValue = newValue.rawValue }
@@ -131,7 +163,14 @@ struct MapView: View {
     var body: some View {
         ZStack(alignment: .top) {
             map
-                .task(id: selectedMapStyle) { updateOSMStyleCacheIfNeeded() }
+                .task(id: selectedMapStyle) {
+                    // Also resets `compassButton`'s heading: a style switch remounts the
+                    // underlying map view (see the class comment on `MapStyleOption`), so a
+                    // heading captured from the previous engine would otherwise linger and
+                    // could leave the button incorrectly visible against a freshly north-up map.
+                    currentHeading = 0
+                    updateOSMStyleCacheIfNeeded()
+                }
             VStack(spacing: 0) {
                 searchBar
                 if isSearchFieldFocused && !resultsListIsEmpty { resultsList }
@@ -284,8 +323,14 @@ struct MapView: View {
         // not just the 3 programmatic recenters `updateCamera(to:)` already covers — otherwise
         // switching to an OSM style discards whatever the user just panned to. Only mounted while
         // an Apple style is active, so this can't fight with the OSM path's own camera sync below.
+        // Also captures the live camera/heading for `compassButton` — MapKit's own `MapCompass`
+        // control isn't used here because it's pinned to the map's top-trailing corner, which sits
+        // directly under `searchBar`'s opaque background in this screen's layout (GitHub #3
+        // follow-up); a custom button stacked above `recenterButton` replaces it for both engines.
         .onMapCameraChange(frequency: .onEnd) { context in
             mapLibreCamera = MapView.mapViewCamera(for: context.region)
+            lastAppleCamera = context.camera
+            currentHeading = context.camera.heading
         }
     }
 
@@ -340,8 +385,11 @@ struct MapView: View {
         // Move MapLibre's attribution control out from under the new bottom-right layers button
         // (which the ODbL/Thunderforest ToS-required attribution must stay visible/tappable
         // under). Only needed here — Apple's own `Map` has no competing attribution control.
+        // No `CompassView()` here (unlike this file's history) — it's pinned to the map's
+        // top-trailing corner, which sits directly under `searchBar`'s opaque background in this
+        // screen's layout (GitHub #3 follow-up); `compassButton`, stacked above `recenterButton`,
+        // replaces it for both engines instead.
         .mapControls {
-            CompassView()
             LogoView()
             AttributionButton().position(.bottomLeft)
         }
@@ -353,6 +401,13 @@ struct MapView: View {
         // our own `updateCamera(to:)`/cache-driven writes to `mapLibreCamera`. Only mounted while
         // an OSM style is active, so this can't fight with the Apple path's own sync above.
         .onChange(of: mapLibreCamera) { _, newValue in
+            // Heading capture for `compassButton`, unguarded by `lastReasonForChange` (unlike the
+            // `position` sync below) so it also reflects our own `resetToNorth()` writes. Only
+            // the `.centered` case (the one gestures produce) carries a `direction`; tracking
+            // states don't, so heading tracking is a no-op while user-location tracking is active.
+            if case let .centered(onCoordinate: _, zoom: _, pitch: _, pitchRange: _, direction: direction) = newValue.state {
+                currentHeading = direction
+            }
             guard let reason = newValue.lastReasonForChange, reason != .programmatic,
                   let region = MapView.region(for: newValue)
             else { return }
@@ -415,10 +470,28 @@ struct MapView: View {
 
     private var mapControlButtons: some View {
         VStack(spacing: 12) {
+            if isRotated { compassButton }
             recenterButton
             layersButton
         }
         .padding()
+    }
+
+    /// Reset-to-north control (GitHub #3), stacked above `recenterButton`. Neither engine's own
+    /// built-in compass (`MapCompass()`/`CompassView()`) is used — both default to the map's
+    /// top-trailing corner, which sits directly under `searchBar`'s opaque background in this
+    /// screen's layout, making them invisible in practice.
+    private var compassButton: some View {
+        Button {
+            resetToNorth()
+        } label: {
+            Image(systemName: "location.north.line.fill")
+                .font(.title2)
+                .rotationEffect(.degrees(-currentHeading))
+                .padding(12)
+                .background(.regularMaterial, in: Circle())
+        }
+        .accessibilityLabel("Reset map to north")
     }
 
     private var recenterButton: some View {
