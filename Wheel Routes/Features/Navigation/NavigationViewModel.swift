@@ -3,6 +3,7 @@
 //  Wheel Routes
 //
 
+import AVFoundation
 import Combine
 import CoreLocation
 import FerrostarCore
@@ -52,7 +53,8 @@ final class NavigationViewModel {
         useMetric: Bool,
         isInitiallyMuted: Bool,
         locationProvider: LocationProviding,
-        setIdleTimerDisabled: @escaping @MainActor (Bool) -> Void = { UIApplication.shared.isIdleTimerDisabled = $0 }
+        setIdleTimerDisabled: @escaping @MainActor (Bool) -> Void = { UIApplication.shared.isIdleTimerDisabled = $0 },
+        speechSynthesizer: any SpeechSynthesizer = AVSpeechSynthesizer()
     ) {
         let rerouteProvider = WheelRoutesRerouteProvider(apiClient: apiClient, plan: journey.plan, useMetric: useMetric)
         self.journey = journey
@@ -64,7 +66,7 @@ final class NavigationViewModel {
             customRouteProvider: rerouteProvider,
             locationProvider: locationProvider,
             navigationControllerConfig: Self.navigationControllerConfig,
-            spokenInstructionObserver: .initAVSpeechSynthesizer(isMuted: isInitiallyMuted)
+            spokenInstructionObserver: SpokenInstructionObserver(synthesizer: speechSynthesizer, isMuted: isInitiallyMuted)
         )
 
         core.delegate = coreDelegate

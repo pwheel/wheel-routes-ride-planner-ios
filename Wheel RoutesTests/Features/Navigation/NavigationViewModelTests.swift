@@ -23,7 +23,8 @@ final class NavigationViewModelTests {
         NavigationViewModel(
             journey: journey, apiClient: client, useMetric: true, isInitiallyMuted: muted,
             locationProvider: locationProvider ?? self.locationProvider,
-            setIdleTimerDisabled: { [weak self] in self?.idleTimerCalls.append($0) }
+            setIdleTimerDisabled: { [weak self] in self?.idleTimerCalls.append($0) },
+            speechSynthesizer: SilentSpeechSynthesizer()
         )
     }
 
