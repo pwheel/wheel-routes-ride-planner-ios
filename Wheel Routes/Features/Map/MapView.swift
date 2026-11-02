@@ -5,6 +5,13 @@ import MapLibreSwiftDSL
 import MapLibreSwiftUI
 import FerrostarCore
 
+/// The screen measurements a route fit depends on. See `MapView.routeFitLayout`.
+private struct RouteFitLayout: Equatable {
+    let mapFrame: CGRect
+    let topOverlayFrame: CGRect
+    let bottomOverlayFrame: CGRect
+}
+
 struct MapView: View {
     @State private var vm: MapViewModel
     @Environment(\.apiClient) private var apiClient
@@ -38,6 +45,14 @@ struct MapView: View {
     @State private var currentHeading: Double = 0
     /// Height of the route summary card, or 0 while it's hidden. See `mapControlMargins`.
     @State private var summaryCardHeight: CGFloat = 0
+    /// True from when the selected route changes until `frameRoute(_:in:)` has fit the camera to it.
+    @State private var isRouteFitPending = false
+    /// Global frames of the map and the overlays it must clear, feeding `routeFitLayout`.
+    @State private var mapFrame = CGRect.zero
+    @State private var topOverlayFrame = CGRect.zero
+    @State private var bottomOverlayFrame = CGRect.zero
+    /// MapLibre's automatic content inset, last reported by `osmMap`. See `frameRoute(_:in:)`.
+    @State private var mapLibreContentInset = UIEdgeInsets.zero
     /// The Apple path's last-seen camera, captured alongside `currentHeading` so `resetToNorth()`
     /// can rebuild it with `heading: 0` while preserving center/distance/pitch — MapKit's
     /// `MapCameraPosition` binding has no in-place "just zero the heading" API.
@@ -75,6 +90,38 @@ struct MapView: View {
     private func updateCamera(to region: MKCoordinateRegion) {
         position = .region(region)
         mapLibreCamera = MapView.mapViewCamera(for: region)
+    }
+
+    /// The measurements a pending route fit will use, or `nil` while no fit can run: nothing is
+    /// pending, or the search field is focused, when the card is hidden and the keyboard displaces
+    /// the bottom overlay (`.task(id: routeFitLayout)` runs the fit once focus clears).
+    private var routeFitLayout: RouteFitLayout? {
+        guard isRouteFitPending, !isSearchFieldFocused, vm.currentJourney != nil, !bottomOverlayFrame.isEmpty else { return nil }
+        return RouteFitLayout(mapFrame: mapFrame, topOverlayFrame: topOverlayFrame, bottomOverlayFrame: bottomOverlayFrame)
+    }
+
+    /// Fits the camera to `journey` above the bottom overlay and below the search bar and legend.
+    /// Writes both engines' cameras, like `updateCamera(to:)`, so a later style switch keeps the fit.
+    private func frameRoute(_ journey: Journey, in layout: RouteFitLayout) {
+        guard let framing = RouteFraming(
+            coordinates: journey.allCoordinates,
+            mapSize: layout.mapFrame.size,
+            obstructions: RouteFraming.obstructions(
+                mapFrame: layout.mapFrame,
+                topOverlayFrame: layout.topOverlayFrame,
+                bottomOverlayFrame: layout.bottomOverlayFrame
+            )
+        ) else { return }
+        // Both engines come out north-up, and MapLibre's bounding-box state carries no heading for
+        // `osmMap`'s `.onChange(of: mapLibreCamera)` to pick up.
+        currentHeading = 0
+        withAnimation {
+            position = .region(framing.region)
+            mapLibreCamera = .boundingBox(
+                MLNCoordinateBounds(sw: framing.southWest, ne: framing.northEast),
+                edgePadding: framing.edgePadding(discounting: mapLibreContentInset)
+            )
+        }
     }
 
     /// Switches the camera into each framework's own follow-user-location
@@ -171,6 +218,11 @@ struct MapView: View {
         CGPoint(x: 8, y: summaryCardHeight > 0 ? summaryCardHeight + 24 : 8)
     }
 
+    /// Identifies the selected route, changing when a new route is planned or the plan is switched.
+    private var routeFitKey: String? {
+        vm.currentJourney.map { "\($0.id)-\($0.plan.rawValue)" }
+    }
+
     private var mapStyleBinding: Binding<MapStyleOption> {
         Binding(get: { selectedMapStyle }, set: { selectedMapStyle = $0 })
     }
@@ -192,6 +244,7 @@ struct MapView: View {
                 if !vm.routeOptions.isEmpty { legendRow.padding(.top, 8) }
             }
             .padding(.top, 8)
+            .onGeometryChange(for: CGRect.self, of: { $0.frame(in: .global) }) { topOverlayFrame = $0 }
         }
         .overlay(alignment: .bottomTrailing) { mapControlButtons }
         .navigationTitle("Plan Route")
@@ -226,6 +279,9 @@ struct MapView: View {
                             .padding(.bottom)
                     }
                 }
+                // Not cleared on disappear: a tab switch fires `onDisappear` too, and an overlay
+                // returning with an unchanged frame doesn't report its geometry again.
+                .onGeometryChange(for: CGRect.self, of: { $0.frame(in: .global) }) { bottomOverlayFrame = $0 }
             }
         }
         .fullScreenCover(item: $activeNavigation) { navigation in
@@ -261,15 +317,22 @@ struct MapView: View {
         .onChange(of: pendingJourney) { _, newValue in
             guard let journey = newValue else { return }
             vm.loadJourney(journey)
-            if let end = journey.allCoordinates.last {
-                withAnimation {
-                    updateCamera(to: MKCoordinateRegion(
-                        center: end,
-                        span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
-                    ))
-                }
-            }
+            // Set here as well as below: reloading the route already showing changes no route key.
+            isRouteFitPending = true
             pendingJourney = nil
+        }
+        .onChange(of: routeFitKey) { _, newValue in
+            isRouteFitPending = newValue != nil
+        }
+        // Waits for layout to settle: the card and legend appear in the same update as the route,
+        // and search-focus changes resize the overlays. Any change to the measurements restarts
+        // this. Only runs while a fit is pending, so later resizes never move a framed camera.
+        .task(id: routeFitLayout) {
+            guard let layout = routeFitLayout else { return }
+            try? await Task.sleep(for: .milliseconds(150))
+            guard !Task.isCancelled, let journey = vm.currentJourney else { return }
+            frameRoute(journey, in: layout)
+            isRouteFitPending = false
         }
         .onChange(of: pendingPlaceSelection) { _, newValue in
             guard let selection = newValue else { return }
@@ -352,6 +415,7 @@ struct MapView: View {
             }
         }
         .mapStyle(style)
+        .onGeometryChange(for: CGRect.self, of: { $0.frame(in: .global) }) { mapFrame = $0 }
         .ignoresSafeArea(edges: .bottom)
         .onTapGesture { isSearchFieldFocused = false }
         // Keep the OSM-path camera in sync with user-driven Apple-map gestures (pan/zoom/rotate),
@@ -429,6 +493,8 @@ struct MapView: View {
             LogoView().margins(mapControlMargins)
             AttributionButton().position(.bottomLeft).margins(mapControlMargins)
         }
+        .onMapViewProxyUpdate { mapLibreContentInset = $0.contentInset }
+        .onGeometryChange(for: CGRect.self, of: { $0.frame(in: .global) }) { mapFrame = $0 }
         .ignoresSafeArea(edges: .bottom)
         .onTapGesture { isSearchFieldFocused = false }
         // Propagate user-driven OSM-map gestures back to the Apple-path camera, mirroring
@@ -779,11 +845,14 @@ struct MapView: View {
             // user's retry after they fix permissions in Settings.
             guard let place = await vm.useCurrentLocation(as: role) else { return }
             if role == .from { selectingFor = .to }
-            withAnimation {
-                updateCamera(to: MKCoordinateRegion(
-                    center: place.clCoordinate,
-                    span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
-                ))
+            // This resumes after any route planning, so with a route the fit takes over instead.
+            if vm.currentJourney == nil {
+                withAnimation {
+                    updateCamera(to: MKCoordinateRegion(
+                        center: place.clCoordinate,
+                        span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
+                    ))
+                }
             }
             if vm.fromPlace != nil && vm.toPlace != nil {
                 isSearchFieldFocused = false
