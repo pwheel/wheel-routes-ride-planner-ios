@@ -310,6 +310,8 @@ struct MapView: View {
 
     private func appleMap(style: MapStyle) -> some View {
         Map(position: $position) {
+            // Also draws MapKit's native heading beam when compass data is available
+            // (GitHub #28); `osmMap` enables MapLibre's equivalent explicitly.
             UserAnnotation()
             ForEach(nonSelectedRouteOptions) { option in
                 if let journey = option.journey {
@@ -405,6 +407,19 @@ struct MapView: View {
         .mapControls {
             LogoView()
             AttributionButton().position(.bottomLeft)
+        }
+        // Heading "gaze" beam on the blue dot (GitHub #28), MapLibre's own
+        // `showsUserHeadingIndicator` — the Apple path's `UserAnnotation()` draws MapKit's
+        // equivalent natively. Gated on existing authorization because setting it `true` also
+        // turns on `showsUserLocation`, which would fire the system permission prompt at launch
+        // for a not-yet-asked user. `isLocationAuthorized` is a non-observable read, so it's
+        // sampled here in `body` and re-sampled on every re-render (e.g. the camera change that
+        // follows a successful recenter). swiftui-dsl only runs this closure from
+        // `updateUIViewController`, never on initial mount — any later re-render applies it.
+        .unsafeMapViewControllerModifier { [showsHeading = vm.isLocationAuthorized] controller in
+            if controller.mapView.showsUserHeadingIndicator != showsHeading {
+                controller.mapView.showsUserHeadingIndicator = showsHeading
+            }
         }
         .ignoresSafeArea(edges: .bottom)
         .onTapGesture { isSearchFieldFocused = false }
