@@ -59,6 +59,15 @@ re-renders rather than observation.
 The setter is guarded on inequality since the closure runs on every
 `updateUIViewController`.
 
+**It can also run too early.** The first update can arrive while the view is
+still 0x0, with the camera not yet positioned. Setting the flag then starts
+location updates before layout, so launch auto-centering flies in from about
+zoom 0.57. At that zoom the whole world fits on screen, MapLibre clamps
+latitude to 0, and the follow animation's completion zooms to 15 on the equator.
+The result is a flat blue map with the dot pinned to the centre, for an
+already-authorized user launching on an OSM style. Found in simulator testing
+(the tests can't see it), so the setter also waits for a non-zero frame.
+
 **Side effect, accepted:** an already-authorized user switching to an OSM
 style now sees the dot even without having tapped recenter (previously it
 appeared only via tracking). This matches the Apple path, where
