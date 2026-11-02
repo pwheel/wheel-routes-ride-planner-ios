@@ -2,7 +2,7 @@
 
 **Issue:** GitHub #7
 **Date:** 2026-11-02
-**Status:** Approved design, pending implementation. The live API response shape hasn't been verified yet (see "Open verification").
+**Status:** Implemented (GitHub #7). The live API response shape was verified; results are under "Open verification".
 
 ## Goal
 
@@ -43,14 +43,17 @@ Once a route is planned, show a summary at the bottom of the Map screen. It give
 - The `MapView`/chart wiring is build-check only, per the convention in `docs/SPEC.md` → Test coverage.
 
 ## Open verification
-1. Capture one live `journey.json` response, with the API key removed, and confirm the following:
-   - the `elevations` attribute name and format;
-   - whether it's present on the route marker as well as on segments;
-   - that its count matches `points` for each segment;
-   - whether `distances` is present.
 
-   Use the trimmed response as the decoder test fixture.
-2. Compare the raw-sum gain against cyclestreets.net's figure for the same route.
+Run on 2026-11-02 with `journey.json`, Bath city centre to Claverton Down (`-2.3597,51.3811` to `-2.3300,51.3700`), all three plans, 22-26 segments each.
+
+| Question | Result |
+|---|---|
+| `elevations` name and format | Confirmed: comma-separated integer metres in a string, e.g. `"25,24,24,24"` |
+| Count matches `points` | Yes, on every segment of all three plans |
+| On the route marker too | Yes, with the shared endpoints already collapsed (191 values for 214 segment points). Not used; per-segment data lets us validate each segment |
+| `distances` present | Yes, per point, the first value is always `0`, e.g. `"0,29,4,9"`. Each segment's values sum exactly to its `distance`, and all segments sum exactly to the route's `length` |
+| Shared endpoints | Elevation and coordinates are identical at every segment boundary |
+| Gain vs cyclestreets.net | The site shows **no total climb figure**. Summing its coarser profile table gives about 162 m up / 12 m down. For balanced, raw sum gives 178 / 29 and a 2 m hysteresis gives 166 / 16. Net climb is 149 m on all of them |
 
 ## Docs
 Update `docs/SPEC.md` in the implementing commit: the Map screen section, Models (`Segment.elevations` and the new `Journey` members), the API contract (the `elevations` attribute is now parsed), and Test coverage.

@@ -204,7 +204,17 @@ struct MapView: View {
             }
         }
         .overlay(alignment: .bottom) {
-            if vm.currentJourney != nil { startNavigationButton }
+            if let journey = vm.currentJourney {
+                VStack(spacing: 8) {
+                    if !isSearchFieldFocused {
+                        RouteSummaryView(journey: journey, tint: color(for: journey.plan))
+                            .padding(.leading)
+                            // Clears the control column: 16 outer padding + ~50 button + 12 gap.
+                            .padding(.trailing, 78)
+                    }
+                    startNavigationButton
+                }
+            }
         }
         .fullScreenCover(item: $activeNavigation) { navigation in
             NavigationScreen(navigation: navigation, locationService: locationService)
