@@ -18,4 +18,18 @@ struct RouteSummaryViewTests {
     @Test func emptySamplesGiveDefaultDomain() {
         #expect(RouteSummaryView.elevationDomain(for: []) == 0...10)
     }
+
+    @Test func distanceDomainSpansZeroToLastSample() {
+        let s = [0.0, 5, 12].map { ElevationSample(distanceMetres: $0, elevationMetres: 0) }
+        #expect(RouteSummaryView.distanceDomain(for: s) == 0...12)
+    }
+
+    @Test func zeroLengthRouteDistanceDomainIsNotDegenerate() {
+        let s = [0.0, 0].map { ElevationSample(distanceMetres: $0, elevationMetres: 0) }
+        #expect(RouteSummaryView.distanceDomain(for: s) == 0...1)
+    }
+
+    @Test func emptySamplesGiveDefaultDistanceDomain() {
+        #expect(RouteSummaryView.distanceDomain(for: []) == 0...1)
+    }
 }

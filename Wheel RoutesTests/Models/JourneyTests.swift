@@ -63,6 +63,7 @@ struct JourneyTests {
             segment(2, elevations: [], distances: []),
         ])
         #expect(route.elevationGainLoss == nil)
+        #expect(route.elevationProfile == nil)
     }
 
     @Test func gainLossNilWhenCountDoesNotMatchPoints() {
@@ -74,6 +75,7 @@ struct JourneyTests {
         let route = journey([bad])
         #expect(route.elevationGainLoss == nil)
         #expect(route.formattedElevation(metric: true) == nil)
+        #expect(route.elevationProfile == nil)
     }
 
     @Test func gainLossNilForJourneyWithNoSegments() {
@@ -96,6 +98,11 @@ struct JourneyTests {
         let route = journey([segment(1, elevations: [10, 20], distances: [])])
         #expect(route.elevationProfile == nil)
         #expect(route.elevationGainLoss?.gain == 10)
+    }
+
+    @Test func profileNilWhenDistancesWrongLength() {
+        let route = journey([segment(1, elevations: [10, 20, 30], distances: [0, 5])])
+        #expect(route.elevationProfile == nil)
     }
 
     @Test func profileNilWhenFewerThanTwoSamples() {
