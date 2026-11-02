@@ -34,6 +34,10 @@ struct Segment: Codable, Identifiable, Equatable {
     let timeSeconds: Int
     let turn: String?
     let points: [Coordinate]
+    /// Per-point elevation in metres, parallel to `points`. Empty when the API omits it.
+    var elevations: [Int] = []
+    /// Per-point distance in metres from the previous point, parallel to `points` (first is 0). Empty when omitted.
+    var pointDistances: [Int] = []
 
     var id: Int { number }
 
