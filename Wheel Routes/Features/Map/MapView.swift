@@ -36,6 +36,8 @@ struct MapView: View {
     /// on every style switch (see `.task(id: selectedMapStyle)` below) so a stale heading from the
     /// previous engine can't leave `compassButton` incorrectly visible after switching styles.
     @State private var currentHeading: Double = 0
+    /// Height of the route summary card, or 0 while it's hidden. See `mapControlMargins`.
+    @State private var summaryCardHeight: CGFloat = 0
     /// The Apple path's last-seen camera, captured alongside `currentHeading` so `resetToNorth()`
     /// can rebuild it with `heading: 0` while preserving center/distance/pitch — MapKit's
     /// `MapCameraPosition` binding has no in-place "just zero the heading" API.
@@ -163,6 +165,12 @@ struct MapView: View {
         nonmutating set { mapStyleRawValue = newValue.rawValue }
     }
 
+    /// Margins for MapLibre's logo and attribution controls: their default 8 pt inset, plus the
+    /// route summary card and its 16 pt bottom padding while the card is showing.
+    private var mapControlMargins: CGPoint {
+        CGPoint(x: 8, y: summaryCardHeight > 0 ? summaryCardHeight + 24 : 8)
+    }
+
     private var mapStyleBinding: Binding<MapStyleOption> {
         Binding(get: { selectedMapStyle }, set: { selectedMapStyle = $0 })
     }
@@ -204,7 +212,21 @@ struct MapView: View {
             }
         }
         .overlay(alignment: .bottom) {
-            if vm.currentJourney != nil { startNavigationButton }
+            if let journey = vm.currentJourney {
+                VStack(spacing: 0) {
+                    startNavigationButton
+                    if !isSearchFieldFocused {
+                        RouteSummaryView(journey: journey, tint: color(for: journey.plan))
+                            .onGeometryChange(for: CGFloat.self, of: \.size.height) { summaryCardHeight = $0 }
+                            .onDisappear { summaryCardHeight = 0 }
+                            .padding(.leading)
+                            // Clears the control column: 16 outer padding + ~50 button + 12 gap.
+                            .padding(.trailing, 78)
+                            // Lines the card's bottom edge up with `mapControlButtons`.
+                            .padding(.bottom)
+                    }
+                }
+            }
         }
         .fullScreenCover(item: $activeNavigation) { navigation in
             NavigationScreen(navigation: navigation, locationService: locationService)
@@ -401,10 +423,11 @@ struct MapView: View {
         // No `CompassView()` here (unlike this file's history) — it's pinned to the map's
         // top-trailing corner, which sits directly under `searchBar`'s opaque background in this
         // screen's layout (GitHub #3 follow-up); `compassButton`, stacked above `recenterButton`,
-        // replaces it for both engines instead.
+        // replaces it for both engines instead. Both controls lift above the route summary card
+        // while it's showing, since the card would otherwise cover them at the bottom-left.
         .mapControls {
-            LogoView()
-            AttributionButton().position(.bottomLeft)
+            LogoView().margins(mapControlMargins)
+            AttributionButton().position(.bottomLeft).margins(mapControlMargins)
         }
         .ignoresSafeArea(edges: .bottom)
         .onTapGesture { isSearchFieldFocused = false }

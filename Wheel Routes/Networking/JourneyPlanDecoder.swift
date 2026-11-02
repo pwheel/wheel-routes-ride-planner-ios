@@ -12,6 +12,9 @@ import Foundation
 /// `type == "route"` carries the journey summary, and markers with
 /// `type == "segment"` carry turn-by-turn steps. Coordinates arrive as a
 /// single space-separated `"lon,lat lon,lat ..."` string per segment.
+/// Segments also carry comma-separated per-point `elevations` and `distances`
+/// strings; these are decoded leniently (a non-string or malformed value yields
+/// an empty/shorter array rather than failing the whole decode).
 enum JourneyPlanDecoder {
 
     enum DecodingFailure: Error {
@@ -39,6 +42,16 @@ enum JourneyPlanDecoder {
         let distance: String?
         let turn: String?
         let points: String?
+        let elevations: LossyString?
+        let distances: LossyString?
+    }
+
+    /// Decodes to `nil` instead of throwing when the JSON value isn't a string.
+    private struct LossyString: Decodable {
+        let value: String?
+        init(from decoder: Decoder) throws {
+            value = try? decoder.singleValueContainer().decode(String.self)
+        }
     }
 
     static func decode(_ data: Data, requestedPlan: RoutePlan) throws -> Journey {
@@ -70,7 +83,9 @@ enum JourneyPlanDecoder {
                     distanceMetres: distanceMetres,
                     timeSeconds: segmentTimeSeconds,
                     turn: turn,
-                    points: parsePoints(attributes.points ?? "")
+                    points: parsePoints(attributes.points ?? ""),
+                    elevations: parseIntegers(attributes.elevations?.value),
+                    pointDistances: parseIntegers(attributes.distances?.value)
                 )
             }
 
@@ -81,6 +96,11 @@ enum JourneyPlanDecoder {
             timeSeconds: timeSeconds,
             segments: segments
         )
+    }
+
+    /// Parses a `"25,24,x"` string into integers, skipping malformed entries.
+    private static func parseIntegers(_ raw: String?) -> [Int] {
+        (raw ?? "").split(separator: ",").compactMap { Int($0) }
     }
 
     /// Parses a `"lon,lat lon,lat ..."` string into coordinates.
