@@ -11,9 +11,10 @@ a beam pointing in the direction the **device is facing** (compass heading).
 This is distinct from direction of *travel* (course), and is what helps when
 standing still at a junction working out which way to go.
 
-Implemented purely with each map engine's **native** heading indicator. There
-is no new location/heading code of our own, and no change to
-`LocationService`.
+Implemented with MapLibre's **native** heading indicator, so it appears on
+**OSM styles only**. There is no new location/heading code of our own, and no
+change to `LocationService`. Apple styles keep the plain dot: on-device
+testing showed MapKit has no usable native equivalent (see Apple path).
 
 ## Where the dot comes from today
 
@@ -73,17 +74,25 @@ style now sees the dot even without having tapped recenter (previously it
 appeared only via tracking). This matches the Apple path, where
 `UserAnnotation()` always shows the dot when authorized.
 
-### Apple path
+### Apple path: no beam (decided after on-device testing)
 
-No code change expected: MapKit's `UserAnnotation()` draws its native
-heading beam on-device when heading data is available. **This needs
-on-device confirmation** (the simulator has no compass). If it turns out not
-to, the fallback is a custom `UserAnnotation { … }` view, rotated by
-`heading − camera.heading` and fed by a new heading stream on
-`LocationService` (`startUpdatingHeading`). That would be a new
-continuous-updates contract, which contradicts the current "one-shot, no
-continuous tracking" `LocationService` invariant, so it needs a SPEC update
-and its own tests. It is deliberately not built speculatively.
+The original assumption was that MapKit's `UserAnnotation()` draws its native
+heading beam when heading data is available. **It doesn't** on a north-up
+map. A throwaway spike tested the two cheap alternatives on an iPhone, and
+neither produced a beam:
+
+- **Compass updates on an app-owned `CLLocationManager`** while an Apple
+  style is shown: MapKit still drew no beam.
+- **A custom `UserAnnotation { userLocation in … }` view:** MapKit never
+  filled in `userLocation.heading`, so there was nothing to draw from.
+
+The remaining option was a custom annotation fed by a new continuous heading
+stream on `LocationService` (`startUpdatingHeading`), rotated by
+`heading − camera.heading`. That breaks the documented "one-shot, no
+continuous tracking" `LocationService` contract, so it would need a SPEC
+change and its own tests. It was **rejected to keep this simple**: the beam is
+OSM-only, the same scope as turn-by-turn navigation, and Apple styles keep the
+plain dot. Revisit only if Apple-style users ask for it.
 
 ### Out of scope
 
@@ -100,8 +109,8 @@ and its own tests. It is deliberately not built speculatively.
   visuals across engines, but needs continuous heading updates in
   `LocationService` (breaking a documented invariant), custom MapLibre
   annotation views, and manual compensation for map rotation. Far more code
-  for the same user-visible result. Rejected unless the Apple native check
-  fails (see above).
+  for the same user-visible result. Rejected, and after the Apple native check
+  failed, not adopted for Apple styles either (see Apple path).
 
 ## Testing
 
@@ -109,7 +118,8 @@ View wiring only, with no ViewModel logic, so it's **build-verify-only**
 per project convention (added to SPEC.md → Test coverage → Known gaps).
 Manual on-device checks:
 
-1. Apple style: rotate the phone → beam on the dot follows.
+1. Apple style: rotate the phone → beam on the dot follows. **Failed on a
+   device**, which led to the OSM-only decision above.
 2. OSM style (e.g. CyclOSM): same; also after panning away from tracking.
 3. Fresh install (permission not yet asked): launch → no permission prompt,
    on both an Apple and an OSM persisted style.

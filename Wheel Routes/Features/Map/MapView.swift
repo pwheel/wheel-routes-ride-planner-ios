@@ -310,8 +310,8 @@ struct MapView: View {
 
     private func appleMap(style: MapStyle) -> some View {
         Map(position: $position) {
-            // Also draws MapKit's native heading beam when compass data is available
-            // (GitHub #28); `osmMap` enables MapLibre's equivalent explicitly.
+            // Plain dot only: MapKit draws no heading beam on a north-up map (confirmed on a
+            // device), so the GitHub #28 beam is OSM-only. See `osmMap`.
             UserAnnotation()
             ForEach(nonSelectedRouteOptions) { option in
                 if let journey = option.journey {
@@ -409,8 +409,8 @@ struct MapView: View {
             AttributionButton().position(.bottomLeft)
         }
         // Heading "gaze" beam on the blue dot (GitHub #28), MapLibre's own
-        // `showsUserHeadingIndicator` — the Apple path's `UserAnnotation()` draws MapKit's
-        // equivalent natively. Gated on existing authorization because setting it `true` also
+        // `showsUserHeadingIndicator`. OSM styles only: the Apple path has no equivalent (see
+        // `appleMap`). Gated on existing authorization because setting it `true` also
         // turns on `showsUserLocation`, which would fire the system permission prompt at launch
         // for a not-yet-asked user. `isLocationAuthorized` is a non-observable read, so it's
         // sampled here in `body` and re-sampled on every re-render (e.g. the camera change that
