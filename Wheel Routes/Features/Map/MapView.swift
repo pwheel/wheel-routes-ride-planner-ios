@@ -310,6 +310,8 @@ struct MapView: View {
 
     private func appleMap(style: MapStyle) -> some View {
         Map(position: $position) {
+            // Plain dot only: MapKit draws no heading beam on a north-up map (confirmed on a
+            // device), so the GitHub #28 beam is OSM-only. See `osmMap`.
             UserAnnotation()
             ForEach(nonSelectedRouteOptions) { option in
                 if let journey = option.journey {
@@ -405,6 +407,24 @@ struct MapView: View {
         .mapControls {
             LogoView()
             AttributionButton().position(.bottomLeft)
+        }
+        // Heading "gaze" beam on the blue dot (GitHub #28), MapLibre's own
+        // `showsUserHeadingIndicator`. OSM styles only: the Apple path has no equivalent (see
+        // `appleMap`). Gated on existing authorization because setting it `true` also
+        // turns on `showsUserLocation`, which would fire the system permission prompt at launch
+        // for a not-yet-asked user. `isLocationAuthorized` is a non-observable read, so it's
+        // sampled here in `body` and re-sampled on every re-render (e.g. the camera change that
+        // follows a successful recenter). swiftui-dsl only runs this closure from
+        // `updateUIViewController`, never on initial mount — any later re-render applies it.
+        // The first such update can still arrive before layout, so wait for a real frame: setting
+        // the flag on a 0x0 view starts location updates too early, and launch auto-centering then
+        // flies in from world zoom, where MapLibre clamps latitude to 0 and strands the camera on
+        // the equator.
+        .unsafeMapViewControllerModifier { [showsHeading = vm.isLocationAuthorized] controller in
+            if controller.mapView.frame.size != .zero,
+               controller.mapView.showsUserHeadingIndicator != showsHeading {
+                controller.mapView.showsUserHeadingIndicator = showsHeading
+            }
         }
         .ignoresSafeArea(edges: .bottom)
         .onTapGesture { isSearchFieldFocused = false }
