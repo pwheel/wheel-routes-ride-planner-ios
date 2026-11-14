@@ -15,12 +15,17 @@ final class MockLocationSearchProvider: LocationSearchProviding {
     private(set) var queriesReceived: [QueryCall] = []
     var resultsToReturn: [Place] = []
     var errorToThrow: Error?
-    var delayMilliseconds: UInt64 = 0
+    /// Queries whose request never completes on its own: it stays in flight until the
+    /// calling task is cancelled, then throws `CancellationError`.
+    var queriesHeldUntilCancelled: Set<String> = []
+    /// Called as each request starts, before any hold.
+    var onSearchStarted: ((String) -> Void)?
 
     func search(query: String, near coordinate: CLLocationCoordinate2D?) async throws -> [Place] {
         try Task.checkCancellation()
-        if delayMilliseconds > 0 {
-            try await Task.sleep(for: .milliseconds(delayMilliseconds))
+        onSearchStarted?(query)
+        if queriesHeldUntilCancelled.contains(query) {
+            try await Task.sleep(for: .seconds(3600))
         }
         try Task.checkCancellation()
         if let errorToThrow { throw errorToThrow }
