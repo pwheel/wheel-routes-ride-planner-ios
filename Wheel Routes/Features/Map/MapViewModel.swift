@@ -204,11 +204,6 @@ final class MapViewModel {
             )
             await selectPlace(place, as: role)
             return place
-        } catch LocationServiceError.alreadyInProgress {
-            // An earlier call is still in flight and still owns `isLoading`;
-            // deliberately leave it set and stay silent rather than surfacing
-            // an error for what is just a duplicate trigger.
-            return nil
         } catch LocationServiceError.permissionDenied, LocationServiceError.restricted {
             isLoading = false
             isPresentingLocationPermissionAlert = true
@@ -244,17 +239,13 @@ final class MapViewModel {
 
     /// One-shot location fetch used only to confirm access, with the Map screen's
     /// shared error handling: `.permissionDenied`/`.restricted` set
-    /// `isPresentingLocationPermissionAlert`, other failures set `errorMessage`,
-    /// and `.alreadyInProgress` is swallowed silently, leaving `isLoading` owned
-    /// by the first call.
+    /// `isPresentingLocationPermissionAlert`, and other failures set `errorMessage`.
     private func confirmCurrentLocationAvailable() async -> Bool {
         isLoading = true
         do {
             _ = try await locationService.currentLocation()
             isLoading = false
             return true
-        } catch LocationServiceError.alreadyInProgress {
-            return false
         } catch LocationServiceError.permissionDenied, LocationServiceError.restricted {
             isLoading = false
             isPresentingLocationPermissionAlert = true

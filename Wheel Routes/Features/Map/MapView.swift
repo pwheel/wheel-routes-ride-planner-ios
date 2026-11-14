@@ -374,11 +374,12 @@ struct MapView: View {
             guard vm.isLocationAuthorized else { return }
             startTrackingCurrentLocation()
         }
-        // One-shot bias-coordinate fetch, tied to this view's real lifetime
-        // (not `MapViewModel.init`, which runs on every discarded
-        // reconstruction of the `@State` value — e.g. every tab switch).
-        // `.task` only runs once per view identity, matching that intent
-        // without an extra `@State` guard flag.
+        // Bias-coordinate fetch, tied to the view's appearance rather than
+        // `MapViewModel.init`, which runs on every discarded reconstruction of
+        // the `@State` value. `.task` re-runs each time the view appears (e.g.
+        // switching back to the Map tab), so this can overlap a "Current
+        // Location" tap. That's safe: `LocationService` makes overlapping
+        // calls share one fetch (GitHub #32).
         .task {
             vm.loadBiasCoordinateIfAuthorized()
         }
