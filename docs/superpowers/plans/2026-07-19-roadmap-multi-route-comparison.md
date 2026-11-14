@@ -89,3 +89,10 @@ These don't need their own file — captured here for now, split out if/when one
 4. **Testability:** can't be exercised via `xcodebuild test` on a simulator without either mocking the location service (straightforward, matches this codebase's protocol-based DI pattern) or using a simulated GPX location — worth deciding the test approach up front, not after the fact.
 
 **Suggested next step:** run `superpowers:brainstorming` on the open questions above (especially permission UX and from/to scope) before writing an implementation plan.
+
+### Route summary card follow-ups (GitHub #7)
+
+Two refinements deferred from the route summary card, not yet planned:
+
+1. **Elevation gain/loss hysteresis.** `Journey.elevationGainLoss` sums every raw up/down step between consecutive points, which overstates climbing on noisy data: on a Bath test route the raw sum gave 178 m up / 29 m down against about 162 m / 12 m from cyclestreets.net's coarser elevation table, whereas ignoring changes smaller than about 2 m (hysteresis) gives 166 m / 16 m. A ~2 m threshold in the gain/loss derivation (with tests) would bring the figures in line without changing the profile.
+2. **Fit-to-route camera framing with bottom insets.** The summary card sits over the bottom of the map and can cover the route. Framing the camera to fit the whole route with a bottom inset equal to the card/Start-button overlay height, on both map engines (Apple `MapCameraPosition` and MapLibre `MapViewCamera`), would keep the route visible above the card.
