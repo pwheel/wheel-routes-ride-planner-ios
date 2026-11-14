@@ -43,7 +43,8 @@ struct MapView: View {
     /// on every style switch (see `.task(id: selectedMapStyle)` below) so a stale heading from the
     /// previous engine can't leave `compassButton` incorrectly visible after switching styles.
     @State private var currentHeading: Double = 0
-    /// Height of the route summary card, or 0 while it's hidden. See `mapControlMargins`.
+    /// Last measured height of the route summary card. Kept while the card is hidden, so only
+    /// read it when `showsSummaryCard`. See `mapControlMargins`.
     @State private var summaryCardHeight: CGFloat = 0
     /// True from when the selected route changes until `frameRoute(_:in:)` has fit the camera to it.
     @State private var isRouteFitPending = false
@@ -215,7 +216,11 @@ struct MapView: View {
     /// Margins for MapLibre's logo and attribution controls: their default 8 pt inset, plus the
     /// route summary card and its 16 pt bottom padding while the card is showing.
     private var mapControlMargins: CGPoint {
-        CGPoint(x: 8, y: summaryCardHeight > 0 ? summaryCardHeight + 24 : 8)
+        CGPoint(x: 8, y: showsSummaryCard && summaryCardHeight > 0 ? summaryCardHeight + 24 : 8)
+    }
+
+    private var showsSummaryCard: Bool {
+        vm.currentJourney != nil && !isSearchFieldFocused
     }
 
     /// Identifies the selected route, changing when a new route is planned or the plan is switched.
@@ -270,8 +275,9 @@ struct MapView: View {
                     startNavigationButton
                     if !isSearchFieldFocused {
                         RouteSummaryView(journey: journey, tint: color(for: journey.plan))
+                            // Not cleared on disappear: a tab switch fires `onDisappear` too, and a
+                            // card that returns at the same height doesn't report it again.
                             .onGeometryChange(for: CGFloat.self, of: \.size.height) { summaryCardHeight = $0 }
-                            .onDisappear { summaryCardHeight = 0 }
                             .padding(.leading)
                             // Clears the control column: 16 outer padding + ~50 button + 12 gap.
                             .padding(.trailing, 78)
@@ -395,6 +401,8 @@ struct MapView: View {
 
     private func appleMap(style: MapStyle) -> some View {
         Map(position: $position) {
+            // Plain dot only: MapKit draws no heading beam on a north-up map (confirmed on a
+            // device), so the GitHub #28 beam is OSM-only. See `osmMap`.
             UserAnnotation()
             ForEach(nonSelectedRouteOptions) { option in
                 if let journey = option.journey {
@@ -492,6 +500,24 @@ struct MapView: View {
         .mapControls {
             LogoView().margins(mapControlMargins)
             AttributionButton().position(.bottomLeft).margins(mapControlMargins)
+        }
+        // Heading "gaze" beam on the blue dot (GitHub #28), MapLibre's own
+        // `showsUserHeadingIndicator`. OSM styles only: the Apple path has no equivalent (see
+        // `appleMap`). Gated on existing authorization because setting it `true` also
+        // turns on `showsUserLocation`, which would fire the system permission prompt at launch
+        // for a not-yet-asked user. `isLocationAuthorized` is a non-observable read, so it's
+        // sampled here in `body` and re-sampled on every re-render (e.g. the camera change that
+        // follows a successful recenter). swiftui-dsl only runs this closure from
+        // `updateUIViewController`, never on initial mount — any later re-render applies it.
+        // The first such update can still arrive before layout, so wait for a real frame: setting
+        // the flag on a 0x0 view starts location updates too early, and launch auto-centering then
+        // flies in from world zoom, where MapLibre clamps latitude to 0 and strands the camera on
+        // the equator.
+        .unsafeMapViewControllerModifier { [showsHeading = vm.isLocationAuthorized] controller in
+            if controller.mapView.frame.size != .zero,
+               controller.mapView.showsUserHeadingIndicator != showsHeading {
+                controller.mapView.showsUserHeadingIndicator = showsHeading
+            }
         }
         .onMapViewProxyUpdate { mapLibreContentInset = $0.contentInset }
         .onGeometryChange(for: CGRect.self, of: { $0.frame(in: .global) }) { mapFrame = $0 }
