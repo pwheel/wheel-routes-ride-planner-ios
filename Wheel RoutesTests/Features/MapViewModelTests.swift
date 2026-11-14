@@ -171,21 +171,6 @@ final class MapViewModelTests {
         #expect(!vm.isLoading)
     }
 
-    /// A duplicate trigger while a fetch is in flight is rejected by
-    /// `LocationService` rather than being allowed to strand the first call's
-    /// continuation. The ViewModel must swallow that rejection silently — no
-    /// error alert, and `isLoading` left alone because the still-running first
-    /// call owns it.
-    @Test func testUseCurrentLocationAlreadyInProgressIsSilentAndLeavesLoadingAlone() async {
-        locationService.errorToThrow = LocationServiceError.alreadyInProgress
-        let returned = await vm.useCurrentLocation(as: .from)
-        #expect(returned == nil)
-        #expect(vm.errorMessage == nil)
-        #expect(!vm.isPresentingLocationPermissionAlert)
-        #expect(vm.fromPlace == nil)
-        #expect(vm.isLoading)
-    }
-
     @Test func testIsLocationAuthorizedReflectsLocationService() {
         locationService.isAuthorized = false
         #expect(!vm.isLocationAuthorized)
@@ -227,15 +212,6 @@ final class MapViewModelTests {
         #expect(vm.errorMessage != nil)
         #expect(!vm.isPresentingLocationPermissionAlert)
         #expect(!vm.isLoading)
-    }
-
-    @Test func testCenterOnCurrentLocationAlreadyInProgressIsSilentAndLeavesLoadingAlone() async {
-        locationService.errorToThrow = LocationServiceError.alreadyInProgress
-        let succeeded = await vm.centerOnCurrentLocation()
-        #expect(!succeeded)
-        #expect(vm.errorMessage == nil)
-        #expect(!vm.isPresentingLocationPermissionAlert)
-        #expect(vm.isLoading)
     }
 
     @Test func testSearchTextChangedWithEmptyQueryClearsResultsImmediately() {
@@ -435,14 +411,6 @@ final class MapViewModelTests {
         let ready = await vm.prepareNavigation()
         #expect(!ready)
         #expect(vm.errorMessage == "Couldn't get your current location. Please try again.")
-        #expect(!vm.isPresentingLocationPermissionAlert)
-    }
-
-    @Test func prepareNavigationStaysSilentForADuplicateInFlightFetch() async {
-        locationService.errorToThrow = LocationServiceError.alreadyInProgress
-        let ready = await vm.prepareNavigation()
-        #expect(!ready)
-        #expect(vm.errorMessage == nil)
         #expect(!vm.isPresentingLocationPermissionAlert)
     }
 

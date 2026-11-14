@@ -14,8 +14,8 @@ import CoreLocation
 protocol LocationServiceProtocol: Sendable {
     /// Fetches a single one-shot fix for the device's current location,
     /// requesting "when in use" authorization first if not yet determined.
-    /// Throws `LocationServiceError.alreadyInProgress` if a previous call
-    /// hasn't resolved yet — callers must not assume serialization.
+    /// A call made while another is still in flight joins it and gets the
+    /// same coordinate or error, rather than starting a second request.
     func currentLocation() async throws -> CLLocationCoordinate2D
 
     /// Non-prompting read of whether location access is already granted
@@ -29,10 +29,6 @@ enum LocationServiceError: Error, Equatable {
     case permissionDenied
     case restricted
     case unavailable
-    /// A fetch was requested while a previous one was still in flight. The
-    /// earlier call still owns the request and will deliver its own result;
-    /// this one is rejected rather than silently stranding it.
-    case alreadyInProgress
 }
 
 /// Wraps `CLLocationManager`'s delegate API behind `async/await`. Does a
@@ -69,7 +65,10 @@ final class LocationService: NSObject, LocationServiceProtocol, CLLocationManage
     private var locationContinuation: CheckedContinuation<CLLocationCoordinate2D, Error>?
     private var authContinuation: CheckedContinuation<CLAuthorizationStatus, Never>?
     private var authTimeoutTask: Task<Void, Never>?
-    private var isFetchInFlight = false
+    /// Coalesces overlapping `currentLocation()` calls into one fetch, so the
+    /// single `locationContinuation`/`authContinuation` slots are never
+    /// overwritten (which would leak a continuation and hang its caller).
+    private let sharedFetch = SharedInFlightTask<CLLocationCoordinate2D>()
 
     override init() {
         super.init()
@@ -83,15 +82,10 @@ final class LocationService: NSObject, LocationServiceProtocol, CLLocationManage
     }
 
     func currentLocation() async throws -> CLLocationCoordinate2D {
-        // Overwriting `locationContinuation`/`authContinuation` while an
-        // earlier call is still suspended on them would leak that
-        // continuation ("SWIFT TASK CONTINUATION MISUSE") and hang its task
-        // forever, so reject the duplicate instead. The UI also suppresses
-        // repeat taps while loading; this is the backstop.
-        guard !isFetchInFlight else { throw LocationServiceError.alreadyInProgress }
-        isFetchInFlight = true
-        defer { isFetchInFlight = false }
+        try await sharedFetch.run { [unowned self] in try await self.fetchCurrentLocation() }
+    }
 
+    private func fetchCurrentLocation() async throws -> CLLocationCoordinate2D {
         var status = manager.authorizationStatus
         if status == .notDetermined {
             status = await requestAuthorization()
