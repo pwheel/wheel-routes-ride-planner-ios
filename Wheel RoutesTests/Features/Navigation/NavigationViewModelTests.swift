@@ -98,10 +98,14 @@ final class NavigationViewModelTests {
 
     @Test func failedRerouteShowsABannerAndKeepsNavigating() async throws {
         client.shouldThrow = URLError(.notConnectedToInternet)
-        let vm = makeViewModel()
+        let provider = ManualLocationProvider(location: fix(lat: 52.20, lng: 0.10))
+        let vm = makeViewModel(locationProvider: provider)
         vm.start()
         try await waitUntil { vm.navigationState != nil }
-        locationProvider.lastLocation = farOffRoute
+        // Ferrostar judges deviation from the previous fix, so the second off-route fix is the
+        // one that triggers the (failing) reroute.
+        try await send(farOffRoute, via: provider, to: vm)
+        try await send(fix(lat: 51.5, lng: -0.91), via: provider, to: vm)
         try await waitUntil { vm.rerouteErrorMessage != nil }
         #expect(vm.rerouteErrorMessage == NavigationViewModel.rerouteFailedMessage)
         #expect(vm.navigationState != nil)
@@ -137,10 +141,13 @@ final class NavigationViewModelTests {
     @Test func successfulRerouteSwitchesToTheReplannedRoute() async throws {
         let replanned = client.makeJourney()   // single segment starting at (52.2054, 0.1132)
         client.journeyToReturn = replanned
-        let vm = makeViewModel()
+        let provider = ManualLocationProvider(location: fix(lat: 52.20, lng: 0.10))
+        let vm = makeViewModel(locationProvider: provider)
         vm.start()
         try await waitUntil { vm.navigationState != nil }
-        locationProvider.lastLocation = farOffRoute
+        // As above: the second off-route fix is the one that triggers the reroute.
+        try await send(farOffRoute, via: provider, to: vm)
+        try await send(fix(lat: 51.5, lng: -0.91), via: provider, to: vm)
         try await waitUntil { vm.navigationState?.routeGeometry.first == GeographicCoordinate(lat: 52.2054, lng: 0.1132) }
         #expect(client.planJourneyCalls.first?.plan == .quietest)
         #expect(vm.rerouteErrorMessage == nil)
