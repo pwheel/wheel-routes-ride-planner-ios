@@ -53,7 +53,10 @@ final class MapViewModel {
     private let apiClient: any APIClientProtocol
     private let locationService: any LocationServiceProtocol
     private let searchProvider: any LocationSearchProviding
-    private var searchDebounceTask: Task<Void, Never>?
+    /// The pending (or running) debounced search from `searchTextChanged(_:)`.
+    /// Read-only outside so tests can await it rather than poll against a
+    /// wall-clock deadline.
+    private(set) var searchDebounceTask: Task<Void, Never>?
 
     /// Best-effort location bias for `search(query:)`, populated by
     /// `loadBiasCoordinateIfAuthorized()` if location access is already

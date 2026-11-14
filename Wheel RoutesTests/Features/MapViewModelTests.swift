@@ -222,6 +222,12 @@ final class MapViewModelTests {
         #expect(vm.searchResults.isEmpty)
     }
 
+    // The debounce tests await `searchDebounceTask` itself rather than polling with
+    // `waitUntil`: CI clones can stall the main actor for longer than any wall-clock
+    // deadline, and the debounce timer, the search and the poll all need it. Keystrokes
+    // are sent back-to-back (not separated by real sleeps) so a stall can't let an
+    // earlier debounce fire before the next keystroke arrives.
+
     @Test func testSearchTextChangedDebouncesAndSearches() async throws {
         vm.searchDebounceMilliseconds = 100
         searchProvider.resultsToReturn = [
@@ -229,7 +235,8 @@ final class MapViewModelTests {
                   coordinate: Coordinate(longitude: 0.1218, latitude: 52.2053))
         ]
         vm.searchTextChanged("Cambridge")
-        try await waitUntil { vm.searchResults.count == 1 }
+        #expect(searchProvider.queriesReceived.isEmpty)
+        await vm.searchDebounceTask?.value
         #expect(vm.searchResults.count == 1)
         #expect(searchProvider.queriesReceived.map(\.query) == ["Cambridge"])
     }
@@ -240,9 +247,10 @@ final class MapViewModelTests {
             Place(id: "1", name: "Cambridge", near: nil, coordinate: Coordinate(longitude: 0, latitude: 0))
         ]
         vm.searchTextChanged("Ca")
-        try await Task.sleep(for: .milliseconds(50))
+        let supersededDebounce = try #require(vm.searchDebounceTask)
         vm.searchTextChanged("Cambridge")
-        try await waitUntil { searchProvider.queriesReceived.map(\.query) == ["Cambridge"] }
+        await supersededDebounce.value
+        await vm.searchDebounceTask?.value
         #expect(searchProvider.queriesReceived.map(\.query) == ["Cambridge"])
     }
 
@@ -252,23 +260,32 @@ final class MapViewModelTests {
             Place(id: "1", name: "Cambridge", near: nil, coordinate: Coordinate(longitude: 0, latitude: 0))
         ]
         vm.searchTextChanged("Cambridge")
-        try await waitUntil { vm.searchResults.count == 1 }
+        await vm.searchDebounceTask?.value
         #expect(vm.errorMessage == nil)
         #expect(vm.searchResults.count == 1)
     }
 
     @Test func testSearchTextChangedDoesNotSetErrorMessageWhenInFlightSearchIsSuperseded() async throws {
         vm.searchDebounceMilliseconds = 10
-        searchProvider.delayMilliseconds = 100
+        // "Ca"'s request stays in flight until it's cancelled, so the next keystroke is
+        // guaranteed to supersede an in-flight search rather than a pending debounce.
+        searchProvider.queriesHeldUntilCancelled = ["Ca"]
         searchProvider.resultsToReturn = [
             Place(id: "1", name: "Cambridge", near: nil, coordinate: Coordinate(longitude: 0, latitude: 0))
         ]
-        vm.searchTextChanged("Ca")
-        try await Task.sleep(for: .milliseconds(30))
+        await withCheckedContinuation { started in
+            searchProvider.onSearchStarted = { query in
+                if query == "Ca" { started.resume() }
+            }
+            vm.searchTextChanged("Ca")
+        }
+        let supersededSearch = try #require(vm.searchDebounceTask)
         vm.searchTextChanged("Cambridge")
-        try await waitUntil { vm.searchResults.count == 1 }
+        await supersededSearch.value
+        await vm.searchDebounceTask?.value
         #expect(vm.errorMessage == nil)
         #expect(vm.searchResults.count == 1)
+        #expect(searchProvider.queriesReceived.map(\.query) == ["Cambridge"])
     }
 
     @Test func testInitSetsSelectedPlanFromInitialValue() {
